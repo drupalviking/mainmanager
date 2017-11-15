@@ -105,9 +105,9 @@ function mainmanager_create_incident_data_object($name, $description, $contact,
   $obj = new stdClass();
   $obj->title = $name;
   $obj->description = $description;
-  $obj->contact = $contact;
+  $obj->contact_name = $contact;
   $obj->contact_email = $contact_email;
-  $obj->contact_phone = $contact_phone;
+  $obj->contact_phone_number = $contact_phone;
   $obj->checkword_id = $checkword_id;
   $obj->checkword_item_id = $checkword_item_id;
   $obj->latitue = $latitude;
