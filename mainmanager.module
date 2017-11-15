@@ -1,0 +1,229 @@
+<?php
+define('MAINMANAGER_API', variable_get('mainmanager_api'));
+define('MAINMANAGER_USERNAME', variable_get('mainmanager_username'));
+define('MAINMANAGER_PASSWORD', variable_get('mainmanager_password'));
+
+function mainmanager_menu() {
+  $items['admin/config/services/mainmanager'] = array(
+    'title' => t('MainManager Config'),
+    'description' => 'Misc settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mainmanager_admin'),
+    'access arguments' => array('administer mainmanager settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_admin().
+ */
+function mainmanager_admin() {
+  $form['mainmanager_config'] = [
+    '#type' => 'fieldset',
+    '#weight' => 25,
+    '#title' => t('Main Manager API configuration'),
+    '#description' => t('Application specific configuration for Main Manager'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  ];
+
+  $form['mainmanager_config']['mainmanager_api'] = [
+    '#type' => 'textfield',
+    '#weight' => 10,
+    '#title' => 'Main Manager API',
+    '#default_value' => variable_get('mainmanager_api', 'http://rvkdemo.mainmanager.is/restapi/'),
+    '#description' => t('Path to Main Manager API'),
+  ];
+
+  $form['mainmanager_config']['mainmanager_username'] = [
+    '#type' => 'textfield',
+    '#weight' => 15,
+    '#title' => t('Username @Main Manager'),
+    '#default_value' => variable_get('mainmanager_username', 'ticket_master'),
+  ];
+
+  $form['mainmanager_config']['mainmanager_password'] = [
+    '#type' => 'textfield',
+    '#weight' => 20,
+    '#title' => t('Password @Main Manager'),
+    '#default_value' => variable_get('mainmanager_password', 'DemoP4ss'),
+  ];
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function mainmanager_permission() {
+  return array(
+    'administer mainmanager settings' => array(
+      'title' => t('Administer MainManager Settings'),
+    ),
+  );
+}
+
+function mainmanager_get_checkwords() {
+  return _mainmanager_get_query(MAINMANAGER_API . 'Incident/GetCheckwords');
+}
+
+function mainmanager_get_checkword_items($checkword_id = 6) {
+  return _mainmanager_get_query(
+    MAINMANAGER_API
+    . 'Incident/GetCheckwordItems?CheckWordID='
+    . (int)$checkword_id
+  );
+}
+
+function mainmanager_get_incident_by_id($id) {
+  return _mainmanager_get_query(
+    MAINMANAGER_API
+    . 'Incident/GetIncident?IncidentID='
+    . (int)$id
+  );
+}
+
+/**
+ * Creates a data object from single values.
+ *
+ * @param string $name
+ * @param string $description
+ * @param string $contact
+ * @param int $checkword_id
+ * @param int $checkword_item_id
+ * @param string|null $contact_email
+ * @param string|null $contact_phone
+ * @param string|null $latitude
+ * @param string|null $longitude
+ * @return \stdClass
+ */
+function mainmanager_create_incident_data_object($name, $description, $contact,
+  $checkword_id = 6, $checkword_item_id = 15, $contact_email = null,
+                 $contact_phone = null, $latitude = null, $longitude = null) {
+  $obj = new stdClass();
+  $obj->title = $name;
+  $obj->description = $description;
+  $obj->contact = $contact;
+  $obj->contact_email = $contact_email;
+  $obj->contact_phone = $contact_phone;
+  $obj->checkword_id = $checkword_id;
+  $obj->checkword_item_id = $checkword_item_id;
+  $obj->latitue = $latitude;
+  $obj->longitude = $longitude;
+
+  return $obj;
+}
+
+/**
+ * Create an incident at MainManager API Service. Requres a full data object to
+ * work. The data object can be created with mainmanager_create_incident_data_object()
+ * function.
+ *
+ * @param object $data
+ * @return \stdClass Response Data from MainManager API
+ */
+function mainmanager_create_incident($data) {
+  $obj = new stdClass();
+  $obj->MainId = 0;
+  $obj->Name = $data->title;
+  $obj->Description = $data->description;
+  $obj->Contact = $data->contact_name;
+  $obj->ContactNumber = $data->contact_phone_number;
+  $obj->ContactEmail = $data->contact_email;
+  $obj->CheckWordID = $data->checkword_id;
+  $obj->CheckWordItemID = $data->checkword_item_id;
+  $obj->Latidue = $data->latitue;
+  $obj->Longitude = $data->longitude;
+  $json_obj = json_encode($obj);
+  $json_obj = str_replace('"', "'", $json_obj);
+  $token = mainmanager_get_auth_token();
+  $return = _mainmanager_curl_post('Incident/CreateIncident', $json_obj, $token);
+  $return = json_decode($return);
+
+  return $return;
+}
+
+function mainmanager_get_auth_token() {
+  $token = json_decode(
+    _mainmanager_curl_post(
+      'token', 'username=ticket_master&password=DemoP4ss&grant_type=password'
+    )
+  );
+
+  return $token;
+}
+
+/**
+ * Sends a GET query to MainManager for specific URL
+ *
+ * @param $uri string
+ *   The fully generated search string
+ * @return object
+ *   Returns a stdClass with the search results or an error message
+ */
+function _mainmanager_get_query($uri) {
+  $search_results = null;
+  $token = mainmanager_get_auth_token();
+
+  if (!empty($cache)) {
+    $search_results = $cache;
+  }
+  else {
+    $options = array(
+      'method' => 'GET',
+      'timeout' => 3,
+      'headers' => array(
+        'Accept' => 'application/json',
+        'Authorization' => "Bearer " . $token->access_token,
+      ),
+    );
+
+    $search_results = drupal_http_request($uri, $options);
+
+    if (empty($search_results->error)) {
+      $search_results = drupal_json_decode($search_results->data);
+    }
+    else {
+      drupal_set_message(t('The search request resulted in the following error: @error.', array(
+        '@error' => $search_results->error,
+      )));
+
+      return $search_results->error;
+    }
+  }
+
+  return $search_results;
+}
+
+function _mainmanager_curl_post($url, $postfields, $token = false) {
+  // Generated by curl-to-PHP: http://incarnate.github.io/curl-to-php/
+  $ch = curl_init();
+
+  curl_setopt($ch, CURLOPT_URL, MAINMANAGER_API . $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $postfields);
+  curl_setopt($ch, CURLOPT_POST, 1);
+  curl_setopt($ch, CURLOPT_VERBOSE, true);
+
+  $headers = array();
+  $headers[] = "Accept: application/json";
+  if(!$token) {
+    $headers[] = "Content-Type: application/x-www-form-urlencoded";
+  }
+  else {
+    $headers[] = "Content-Type: application/json";
+    $headers[] = 'Authorization: Bearer ' . $token->access_token;
+  }
+
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+  $result = curl_exec($ch);
+  if (curl_errno($ch)) {
+    echo 'Error:' . curl_error($ch);
+  }
+  curl_close ($ch);
+
+  return $result;
+}

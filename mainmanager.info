@@ -1,0 +1,4 @@
+name = MainManager Communication Module
+description = Module to communicate with the MainManager API
+core = 7.x
+package = 1xInternet
