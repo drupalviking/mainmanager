@@ -1,8 +1,14 @@
 <?php
+/**
+ * Constant definition
+ */
 define('MAINMANAGER_API', variable_get('mainmanager_api'));
 define('MAINMANAGER_USERNAME', variable_get('mainmanager_username'));
 define('MAINMANAGER_PASSWORD', variable_get('mainmanager_password'));
 
+/**
+ * Implements hook_menu().
+ */
 function mainmanager_menu() {
   $items['admin/config/services/mainmanager'] = array(
     'title' => t('MainManager Config'),
@@ -65,10 +71,22 @@ function mainmanager_permission() {
   );
 }
 
+/**
+ * Calls the Mainmanager API and returns all the Checkwords.
+ *
+ * @return object
+ */
 function mainmanager_get_checkwords() {
   return _mainmanager_get_query(MAINMANAGER_API . 'Incident/GetCheckwords');
 }
 
+/**
+ * Calls the Mainmanager API and returns all the Checkword Items. Checkword items
+ * are used to classify the incidents. (Internal taxonomy of Mainmanager).
+ *
+ * @param int $checkword_id
+ * @return object
+ */
 function mainmanager_get_checkword_items($checkword_id = 6) {
   return _mainmanager_get_query(
     MAINMANAGER_API
@@ -77,6 +95,12 @@ function mainmanager_get_checkword_items($checkword_id = 6) {
   );
 }
 
+/**
+ * Gets one Mainmanager incident, by ID
+ *
+ * @param $id
+ * @return object
+ */
 function mainmanager_get_incident_by_id($id) {
   return _mainmanager_get_query(
     MAINMANAGER_API
@@ -110,7 +134,7 @@ function mainmanager_create_incident_data_object($name, $description, $contact,
   $obj->contact_phone_number = $contact_phone;
   $obj->checkword_id = $checkword_id;
   $obj->checkword_item_id = $checkword_item_id;
-  $obj->latitue = $latitude;
+  $obj->latitude = $latitude;
   $obj->longitude = $longitude;
 
   return $obj;
@@ -134,7 +158,7 @@ function mainmanager_create_incident($data) {
   $obj->ContactEmail = $data->contact_email;
   $obj->CheckWordID = $data->checkword_id;
   $obj->CheckWordItemID = $data->checkword_item_id;
-  $obj->Latidue = $data->latitue;
+  $obj->Latitude = $data->latitude;
   $obj->Longitude = $data->longitude;
   $json_obj = json_encode($obj);
   $json_obj = str_replace('"', "'", $json_obj);
@@ -145,6 +169,12 @@ function mainmanager_create_incident($data) {
   return $return;
 }
 
+/**
+ * Gets an auth token from Mainmanager, in order to communicate further with the
+ * API
+ *
+ * @return mixed
+ */
 function mainmanager_get_auth_token() {
   $token = json_decode(
     _mainmanager_curl_post(
