@@ -146,7 +146,7 @@ function mainmanager_create_incident_data_object($node, $checkword_id = 6, $chec
     foreach($node->field_image[LANGUAGE_NONE] as $img) {
       $img_obj = new stdClass();
       $file = file_load($img['fid']);
-      $real_image = file_get_contents( DRUPAL_ROOT  . '/sites/default/files/indication_images' . $file->filename );
+      $real_image = file_get_contents( $file->uri );
       $img_obj->image_filename = $file->filename;
       $img_obj->image_base_64_encoded = base64_encode($real_image);
       $image_array[] = $img_obj;
