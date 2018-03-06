@@ -123,19 +123,37 @@ function mainmanager_get_incident_by_id($id) {
  * @param string|null $longitude
  * @return \stdClass
  */
-function mainmanager_create_incident_data_object($name, $description, $contact,
-  $checkword_id = 6, $checkword_item_id = 15, $contact_email = null,
-                 $contact_phone = null, $latitude = null, $longitude = null) {
+function mainmanager_create_incident_data_object($node, $checkword_id = 6, $checkword_item_id = 15) {
   $obj = new stdClass();
-  $obj->title = $name;
-  $obj->description = $description;
-  $obj->contact_name = $contact;
-  $obj->contact_email = $contact_email;
-  $obj->contact_phone_number = $contact_phone;
+  $obj->title = $node->title;
+  $obj->description = (isset($node->field_interpered_indication_text[LANGUAGE_NONE][0]))
+    ? $node->field_interpered_indication_text[LANGUAGE_NONE][0]['value'] : '';
+  $obj->contact_name = (isset($node->field_indication_reporter_name[LANGUAGE_NONE][0]))
+    ? $node->field_indication_reporter_name[LANGUAGE_NONE][0]['value'] : '';
+  $obj->contact_email = (isset($node->field_indication_reporter_email[LANGUAGE_NONE][0]))
+    ? $node->field_indication_reporter_email[LANGUAGE_NONE][0]['value'] : '';
+  $obj->contact_phone_number = (isset($node->field_indication_reporter_phone[LANGUAGE_NONE][0]))
+    ? $node->field_indication_reporter_phone[LANGUAGE_NONE][0]['value'] : '';
+  $obj->latitude = (isset($node->field_indication_position_x[LANGUAGE_NONE][0]))
+    ? $node->field_indication_position_x[LANGUAGE_NONE][0]['value'] : '';
+  $obj->longitude = (isset($node->field_indication_position_x[LANGUAGE_NONE][0]))
+    ? $node->field_indication_position_y[LANGUAGE_NONE][0]['value'] : '';
   $obj->checkword_id = $checkword_id;
   $obj->checkword_item_id = $checkword_item_id;
-  $obj->latitude = $latitude;
-  $obj->longitude = $longitude;
+
+  if(isset($node->field_image[LANGUAGE_NONE][0])) {
+    $image_array = [];
+    foreach($node->field_image[LANGUAGE_NONE] as $img) {
+      $img_obj = new stdClass();
+      $file = file_load($img['fid']);
+      $real_image = file_get_contents( DRUPAL_ROOT  . '/sites/default/files/indication_images' . $file->filename );
+      $img_obj->image_filename = $file->filename;
+      $img_obj->image_base_64_encoded = base64_encode($real_image);
+      $image_array[] = $img_obj;
+    }
+
+    $obj->images = $image_array;
+  }
 
   return $obj;
 }
@@ -160,6 +178,14 @@ function mainmanager_create_incident($data) {
   $obj->CheckWordItemID = $data->checkword_item_id;
   $obj->Latitude = $data->latitude;
   $obj->Longitude = $data->longitude;
+  if(isset($data->images)) {
+    foreach($data->images as $img) {
+      $image = new stdClass();
+      $image->FullName = $img->image_filename;
+      $image->BinaryDataBase64 = $img->image_base_64_encoded;
+      $obj->Documents[] = $image;
+    }
+  }
   $json_obj = json_encode($obj);
   $json_obj = str_replace('"', "'", $json_obj);
   $token = mainmanager_get_auth_token();
